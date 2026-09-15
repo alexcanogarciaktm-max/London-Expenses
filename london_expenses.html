@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<title>London Expenses</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f5f5f5;color:#171717}
+.app{max-width:720px;margin:auto;padding:18px 16px 40px}.top{display:flex;justify-content:space-between;align-items:end;margin-bottom:16px}
+h1{font-size:27px;margin:0 0 4px}.muted{color:#737373;font-size:13px}.card{background:white;border:1px solid #e5e5e5;border-radius:18px;padding:16px;margin-bottom:12px}
+.total{font-size:40px;font-weight:750;letter-spacing:-1px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label{font-size:13px;font-weight:600;display:block;margin-bottom:6px}input,select,button{width:100%;min-height:46px;border-radius:12px;border:1px solid #d4d4d4;background:white;padding:10px 12px;font-size:16px}
+button{background:#111827;color:white;border:0;font-weight:650;cursor:pointer}.secondary{background:#f3f4f6;color:#171717;border:1px solid #e5e7eb}.danger{background:#fff;color:#b91c1c;border:1px solid #fecaca}
+.form{display:grid;gap:11px}.section-title{font-weight:700;margin-bottom:10px}.row{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:9px 0;border-bottom:1px solid #eee}.row:last-child{border:0}.amount{font-variant-numeric:tabular-nums;font-weight:650;white-space:nowrap}
+.pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#f3f4f6;font-size:12px;color:#525252}.bar{height:8px;background:#eee;border-radius:99px;overflow:hidden;margin-top:5px}.fill{height:100%;background:#111827}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.small{font-size:12px}.empty{text-align:center;padding:12px;color:#888}
+@media(max-width:480px){.grid{grid-template-columns:1fr}.top{align-items:start}.total{font-size:34px}}
+</style>
+</head>
+<body>
+<main class="app">
+<div class="top"><div><h1>London Expenses</h1><div class="muted">Quick student spending tracker</div></div>
+<div><select id="month"></select></div></div>
+
+<section class="card">
+<div class="muted">This month</div><div class="total" id="total">£0.00</div>
+<div class="grid" style="margin-top:10px">
+<div><div class="muted">Daily average</div><strong id="daily">£0.00</strong></div>
+<div><div class="muted">Projected month</div><strong id="projected">£0.00</strong></div>
+</div>
+</section>
+
+<section class="card">
+<div class="section-title">Add expense</div>
+<form id="form" class="form">
+<div class="grid">
+<div><label for="amount">Amount (£)</label><input id="amount" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="0.00" required></div>
+<div><label for="category">Category</label><select id="category">
+<option>Rent</option><option>Transport</option><option>Food</option><option>Groceries</option><option>Entertainment</option><option>Clothes</option><option>University</option><option>Household</option><option>Phone & subscriptions</option><option>Personal</option><option>Other</option>
+</select></div>
+</div>
+<div><label for="note">What was it? <span class="muted">(optional)</span></label><input id="note" maxlength="80" placeholder="e.g. Tesco, Tube, dinner"></div>
+<div><label for="date">Date</label><input id="date" type="date" required></div>
+<button type="submit">＋ Add expense</button>
+</form>
+</section>
+
+<section class="card">
+<div class="section-title">Spending by category</div>
+<div id="categories"></div>
+</section>
+
+<section class="card">
+<div class="section-title">Recent expenses</div>
+<div id="recent"></div>
+</section>
+
+<section class="card">
+<div class="section-title">Allowance calculator</div>
+<div class="muted">Once you have at least 2 months, this uses your average monthly spending and adds a 10% buffer.</div>
+<div id="allowance" class="total" style="font-size:28px;margin-top:8px">Not enough data</div>
+<div id="allowanceText" class="muted"></div>
+</section>
+
+<section class="card">
+<div class="section-title">Your data</div>
+<div class="actions">
+<button id="export" type="button" class="secondary">Export CSV</button>
+<button id="clear" type="button" class="danger">Delete all data</button>
+</div>
+<div class="small muted" style="margin-top:10px">Data is stored locally in this browser. Export regularly if you want a backup.</div>
+</section>
+</main>
+
+<script>
+(function(){
+const KEY="londonStudentExpenses_v2";
+let expenses=JSON.parse(localStorage.getItem(KEY)||"[]");
+const $=id=>document.getElementById(id);
+const money=n=>"£"+Number(n||0).toFixed(2);
+const pad=n=>String(n).padStart(2,"0");
+function today(){const d=new Date();return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())}
+$("date").value=today();
+
+function save(){localStorage.setItem(KEY,JSON.stringify(expenses))}
+function monthOf(s){return s.slice(0,7)}
+function labelMonth(k){const [y,m]=k.split("-");return new Date(Number(y),Number(m)-1,1).toLocaleDateString(undefined,{month:"long",year:"numeric"})}
+function currentMonth(){return today().slice(0,7)}
+function monthList(){
+ let set=new Set([currentMonth()]);
+ expenses.forEach(e=>set.add(monthOf(e.date)));
+ return [...set].sort().reverse();
+}
+function renderMonthSelect(){
+ const m=monthList(), cur=$("month").value||currentMonth();
+ $("month").innerHTML=m.map(x=>`<option value="${x}">${labelMonth(x)}</option>`).join("");
+ $("month").value=m.includes(cur)?cur:m[0];
+}
+function render(){
+ renderMonthSelect();
+ const selected=$("month").value||currentMonth();
+ const items=expenses.filter(e=>monthOf(e.date)===selected);
+ const total=items.reduce((s,e)=>s+e.amount,0);
+ const now=new Date(), isCurrent=selected===currentMonth();
+ let days;
+ if(isCurrent) days=now.getDate();
+ else {const [y,m]=selected.split("-");days=new Date(Number(y),Number(m),0).getDate()}
+ $("total").textContent=money(total);
+ $("daily").textContent=money(total/Math.max(days,1));
+ $("projected").textContent=isCurrent?money((total/Math.max(now.getDate(),1))*new Date(now.getFullYear(),now.getMonth()+1,0).getDate()):money(total);
+
+ const by={};items.forEach(e=>by[e.category]=(by[e.category]||0)+e.amount);
+ const cats=Object.entries(by).sort((a,b)=>b[1]-a[1]);
+ const max=cats[0]?.[1]||1;
+ $("categories").innerHTML=cats.length?cats.map(([c,v])=>`<div class="row"><div style="flex:1;min-width:0"><div>${escape(c)}</div><div class="bar"><div class="fill" style="width:${Math.round(v/max*100)}%"></div></div></div><div class="amount">${money(v)}</div></div>`).join(""):`<div class="empty">No expenses this month.</div>`;
+
+ const recent=[...items].sort((a,b)=>b.created-a.created).slice(0,12);
+ $("recent").innerHTML=recent.length?recent.map(e=>`<div class="row"><div style="min-width:0"><div>${escape(e.note||e.category)}</div><div class="muted">${escape(e.category)} · ${e.date}</div></div><div style="text-align:right"><div class="amount">${money(e.amount)}</div><button type="button" class="small secondary" data-del="${e.id}" style="width:auto;min-height:32px;padding:5px 9px;margin-top:4px">Delete</button></div></div>`).join(""):`<div class="empty">No expenses yet.</div>`;
+
+ const months=monthList();
+ const totals=months.map(k=>expenses.filter(e=>monthOf(e.date)===k).reduce((s,e)=>s+e.amount,0));
+ if(totals.length>=2){
+   const avg=totals.reduce((a,b)=>a+b,0)/totals.length;
+   const allowance=avg*1.10;
+   $("allowance").textContent=money(allowance);
+   $("allowanceText").textContent=`Average across ${totals.length} months: ${money(avg)} · includes 10% buffer.`;
+ } else {$("allowance").textContent="Not enough data";$("allowanceText").textContent="Add expenses across at least 2 months to get a suggestion."}
+}
+function escape(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+
+$("form").addEventListener("submit",e=>{
+ e.preventDefault();
+ const amount=Number($("amount").value);
+ if(!Number.isFinite(amount)||amount<=0)return;
+ expenses.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2),amount,category:$("category").value,note:$("note").value.trim(),date:$("date").value,created:Date.now()});
+ save(); $("amount").value="";$("note").value="";$("date").value=today(); render(); $("amount").focus();
+});
+$("month").addEventListener("change",render);
+$("recent").addEventListener("click",e=>{const id=e.target.dataset.del;if(!id)return;if(confirm("Delete this expense?")){expenses=expenses.filter(x=>x.id!==id);save();render()}});
+$("clear").addEventListener("click",()=>{if(confirm("Delete ALL expenses? This cannot be undone.")){expenses=[];save();render()}});
+$("export").addEventListener("click",()=>{
+ const rows=[["Date","Category","Description","Amount"],...expenses.sort((a,b)=>a.date.localeCompare(b.date)).map(e=>[e.date,e.category,e.note,e.amount.toFixed(2)])];
+ const csv=rows.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(",")).join("\n");
+ const blob=new Blob([csv],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");
+ a.href=url;a.download="london-expenses.csv";a.click();setTimeout(()=>URL.revokeObjectURL(url),500);
+});
+render();
+})();
+</script>
+</body>
+</html>
